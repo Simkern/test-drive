@@ -311,7 +311,7 @@ contains
 
 
   !> Driver for testsuite
-  recursive subroutine run_testsuite(collect, unit, stat, parallel)
+  recursive subroutine run_testsuite(collect, unit, stat, parallel, silent)
 
     !> Collect tests
     procedure(collect_interface) :: collect
@@ -325,23 +325,31 @@ contains
     !> Run the tests in parallel
     logical, intent(in), optional :: parallel
 
+    logical, intent(in), optional :: silent
+
     type(unittest_type), allocatable :: testsuite(:)
     integer :: it
-    logical :: parallel_
+    logical :: parallel_, silent_
 
     parallel_ = .true.
     if(present(parallel)) parallel_ = parallel
+    if (present(silent)) then
+      silent_ = silent
+    else
+      silent_ = .true.
+    end if 
 
     call collect(testsuite)
 
     !$omp parallel do schedule(dynamic) shared(testsuite, unit) reduction(+:stat) &
     !$omp if (parallel_)
     do it = 1, size(testsuite)
-      !$omp critical(testdrive_testsuite)
-      !write(unit, '(1x, 3(1x, a), 1x, "(", i0, "/", i0, ")")') &
-      !  & "Starting", testsuite(it)%name, "...", it, size(testsuite)
-      write(unit, *) testsuite(it)%name
-      !$omp end critical(testdrive_testsuite)
+      if (.not.silent_) then
+         !$omp critical(testdrive_testsuite)
+         write(unit, '(1x, 3(1x, a), 1x, "(", i0, "/", i0, ")")') &
+           & "Starting", testsuite(it)%name, "...", it, size(testsuite)
+         !$omp end critical(testdrive_testsuite)
+      end if
       call run_unittest(testsuite(it), unit, stat)
     end do
 
@@ -384,7 +392,7 @@ contains
 
 
   !> Run a selected unit test
-  recursive subroutine run_unittest(test, unit, stat)
+  recursive subroutine run_unittest(test, unit, stat, silent)
 
     !> Unit test
     type(unittest_type), intent(in) :: test
@@ -395,17 +403,28 @@ contains
     !> Number of failed tests
     integer, intent(inout) :: stat
 
+    logical, intent(in), optional :: silent
+
     type(error_type), allocatable :: error
     character(len=:), allocatable :: message
+    logical :: silent_
+
+    if (present(silent)) then
+      silent_ = silent
+    else
+      silent_ = .true.
+    end if 
 
     call test%test(error)
     if (.not.test_skipped(error)) then
       if (allocated(error) .neqv. test%should_fail) stat = stat + 1
     end if
-    call make_output(message, test, error)
-    !$omp critical(testdrive_testsuite)
-    write(unit, '(a)') message
-    !$omp end critical(testdrive_testsuite)
+    if (.not. silent_) then
+      call make_output(message, test, error)
+      !$omp critical(testdrive_testsuite)
+      write(unit, '(a)') message
+      !$omp end critical(testdrive_testsuite)
+    end if
     if (allocated(error)) then
       call clear_error(error)
     end if
