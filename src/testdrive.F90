@@ -338,8 +338,9 @@ contains
     !$omp if (parallel_)
     do it = 1, size(testsuite)
       !$omp critical(testdrive_testsuite)
-      write(unit, '(1x, 3(1x, a), 1x, "(", i0, "/", i0, ")")') &
-        & "Starting", testsuite(it)%name, "...", it, size(testsuite)
+      !write(unit, '(1x, 3(1x, a), 1x, "(", i0, "/", i0, ")")') &
+      !  & "Starting", testsuite(it)%name, "...", it, size(testsuite)
+      write(unit, *) testsuite(it)%name
       !$omp end critical(testdrive_testsuite)
       call run_unittest(testsuite(it), unit, stat)
     end do
